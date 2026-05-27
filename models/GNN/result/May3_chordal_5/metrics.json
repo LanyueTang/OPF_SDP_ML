@@ -1,0 +1,29 @@
+{
+  "rmse_all_pairs": 1.737265944480896,
+  "rmse_true_min_entry": 1.767885684967041,
+  "regret": {
+    "regret_mean": 0.9206034541130066,
+    "regret_median": 0.36872702836990356,
+    "regret_p90": 2.401780080795288
+  },
+  "N": 324,
+  "K": 15,
+  "regret_compare": {
+    "global_best_mean_strategy": 7,
+    "model_selected_regret": {
+      "mean": 0.9206034541130066,
+      "median": 0.36872702836990356,
+      "p90": 2.401780080795288
+    },
+    "global_fixed_strategy_regret": {
+      "mean": 0.9079483151435852,
+      "median": 0.31155925989151,
+      "p90": 2.4801996707916256
+    }
+  },
+  "virtual_strategy": {
+    "name": "Virtual_BestByPred",
+    "mean_selected_true_runtime": 0.9206034541130066,
+    "mean_regret": 920603525120.0
+  }
+}

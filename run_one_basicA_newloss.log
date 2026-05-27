@@ -1,0 +1,34 @@
+nohup: ignoring input
+/tmp/tmphvgipaaz: line 3: 895078 Killed                  python -u models/GNN/runners/run_one_basicA_newloss.py
+
+ERROR conda.cli.main_run:execute(49): `conda run python -u models/GNN/runners/run_one_basicA_newloss.py` failed. (See above for error)
+🔧 Using device: cuda
+   GPU: NVIDIA GeForce RTX 3060
+   Memory: 12.63 GB
+📖 Loading samples from /home/goatoine/Documents/Lanyue/data/data_for_GCN/data_basic_GCN/case1888rte_0407_samples.npz
+✅ Loaded 24300 samples
+📊 summary: 24300 samples
+🔧 After deduplication: 1620 samples (from 24300)
+📈 y_cls class distribution: {0: 23, 1: 59, 2: 101, 3: 94, 4: 52, 5: 84, 6: 137, 7: 232, 8: 184, 9: 169, 10: 34, 11: 101, 12: 194, 13: 96, 14: 60}
+✅ y_cls distribution plot saved to: /home/goatoine/Documents/Lanyue/models/GNN/result/y_cls_distribution.png
+📊 y_reg statistics:
+  Min:  18.831581
+  Max:  360.673981
+  Mean: 58.239087
+  Std:  45.431653
+✅ y_reg distribution plot saved to: /home/goatoine/Documents/Lanyue/models/GNN/result/y_reg_distribution.png
+✅ True regret plots saved:
+   - /home/goatoine/Documents/Lanyue/models/GNN/result/reader_diagnostics/opf_vA_true_regret_heatmap_sorted.png
+   - /home/goatoine/Documents/Lanyue/models/GNN/result/reader_diagnostics/opf_vA_true_regret_hist.png
+   - /home/goatoine/Documents/Lanyue/models/GNN/result/reader_diagnostics/opf_vA_true_regret_by_config_box.png
+🔧 After feature filtering: kept ['A_grid', 'node_load', 'y_cls', 'y_arr_reg']
+🔍 Normalizing node_load: shape torch.Size([1620, 1888, 2])
+🔍 MultiDimNormalizer fit: original shape torch.Size([1620, 1888, 2]) -> reshaped torch.Size([3058560, 2])
+🔍 num_features: 2, original_data_shape: torch.Size([1888, 2])
+[INFO] Dataset split:
+  Train: 972 samples
+  Val: 324 samples
+  Test: 324 samples
+[INFO] Input feature dimension: 2
+[INFO] Class counts in training set (C=15): [14, 34, 63, 58, 27, 56, 72, 140, 106, 101, 26, 65, 111, 64, 35]
+

@@ -1,0 +1,62 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{graphicx}
+\geometry{margin=1in}
+
+\title{Why Element-wise Array MSE Collapses to Low-Variance Prediction}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\paragraph{一句话结论}
+关键原因就是：你在做\textbf{数组每个元素的 MSE 回归}，其统计最优解是逐维条件均值，条件均值变化弱时就会收缩成低方差窄带。
+
+\paragraph{(1) 你的训练目标}
+设 $Y=(Y_1,\dots,Y_K)$ 为 $K$ 维 regret 向量，预测为 $f(X)=(f_1(X),\dots,f_K(X))$。你优化的是
+\[
+\mathcal L(f)=\mathbb E\|Y-f(X)\|_2^2
+=\sum_{k=1}^K\mathbb E\big[(Y_k-f_k(X))^2\big].
+\]
+这等价于把每个维度 $k$ 当作独立标量回归。
+
+\paragraph{(2) 每一维 MSE 的解析最优解}
+对每个 $k$，总体风险最优为
+\[
+f_k^*(X)=\mathbb E[Y_k\mid X].
+\]
+所以整体最优是
+\[
+f^*(X)=\mathbb E[Y\mid X].
+\]
+若特征对目标的信息弱，则 $\mathbb E[Y_k\mid X]\approx c_k$（近常数），故预测集中在窄区间。
+
+\paragraph{(3) 为什么是低方差（方差分解）}
+每一维满足
+\[
+\mathrm{Var}(Y_k)
+=\mathbb E[\mathrm{Var}(Y_k\mid X)]
++\mathrm{Var}(\mathbb E[Y_k\mid X]).
+\]
+模型最多只能学到第二项。若第二项小，则最优预测本身方差就小，出现你看到的“横向一条带”。
+
+\paragraph{图像证据}
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.82\linewidth]{../Feb20_appnp_m1_regret/scatter_all_pairs.png}
+    \caption{All pairs true vs predicted: predicted values are compressed into a narrow band.}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.85\linewidth]{opf_vA_balance_test_adjmode_real_true_regret_heatmap_sorted.png}
+    \caption{True regret matrix (all data): target has wide/heterogeneous structure.}
+\end{figure}
+
+\paragraph{补充}
+归一化会改善优化数值条件，但不是这次塌缩的主因；主因是 ``逐元素 MSE $\Rightarrow$ 条件均值解'' 在当前特征信息下天然低方差。
+
+\end{document}

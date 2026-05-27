@@ -1,0 +1,45 @@
+seed: 42
+
+data:
+  npz_path: "/home/goatoine/Documents/Lanyue/data/data_for_GCN/data_basic_GCN/case2746wop_1118_samples.npz"
+  reader: "opf_vA_balance_pointwise_adjmode_highvar_instance"
+  adj_mode: "real"
+  scheme_dim: 6
+  num_workers: 4
+  norm: zscore
+  highvar_quantile: 0.70
+  highvar_topk: null
+
+train:
+  batch_size: 64
+  epochs: 50
+  lr: 4.0e-4
+  scheduler: null
+  early_stop: null
+
+model:
+  name: "gcn_basicA_appnp_pointwise_nodeid_weak"
+  hidden: 64
+  layers: 1
+  dropout: 0.2
+  K: 1
+  alpha: 0.9
+  use_ln: true
+  node_id_dim: 8
+  max_nodes: 3000
+  readout: "weighted"
+  attn_temperature: 1.0
+  out_scalar: true
+
+loss:
+  name: "scalar_mse"
+
+task:
+  name: "opf_basicA_task"
+
+evaluator:
+  name: "arr_rsm_runtime"
+  output_dir: "/home/goatoine/Documents/Lanyue/models/GNN/result/Feb24_pointwise_nodeid_weak_highvar_test"
+
+logger:
+  log_dir: "/home/goatoine/Documents/Lanyue/models/GNN/result/Feb24_pointwise_nodeid_weak_highvar_test/log"

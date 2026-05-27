@@ -1,0 +1,91 @@
+# exp_debug.yaml  —— 最小可运行配置（用于整体流程 debug）
+
+seed: 42
+
+# ======================
+# 数据读取（Reader 版本化）
+# ======================
+data:
+  npz_path : "/home/goatoine/Documents/Lanyue/data/data_for_GCN/data_basic_GCN/case1888rte_0504_samples.npz"
+  reader: "opf_reg_array" #key_features = ["A_grid", "node_load", "y_cls", "y_arr_reg"]
+  adj_mode: "real" #"real";"identity";"random";"random_deg";"nobalmatrix"
+  num_workers: 4
+  norm: zscore  # used in main 
+
+# ===============
+# 训练超参数
+# ===============
+train:
+  batch_size: 64
+  epochs: 200
+  lr: 4.0e-3
+
+  # # 下面三项先按需开关；不需要就保留默认
+  # amp: false           # 混合精度
+  # grad_clip: null      # 例如 1.0
+  # accum_steps: 1       # 梯度累积步数
+
+  # # 学习率调度器（先关掉；需要时换成 steplr / cosine）
+  scheduler: null
+  # scheduler:
+  #   name: "steplr"
+  #   step_size: 10
+  #   gamma: 0.5
+
+  # # 早停（验证指标是 val_mae；不需要就设为 null）
+  early_stop: null
+  # # early_stop:
+  # #   patience: 5
+  # #   mode: "min"
+  # #   min_delta: 1.0e-4
+
+# ==================
+# 模型（GCNGlobal）
+# ==================
+# model:
+#   name: "gcn_basicA_nhop"
+#   hidden: 64
+#   layers: 2
+#   readout: "mean"          # mean | sum | max
+#   out_scalar: None       
+#   out_array_dim: 6      
+#   n_hops: 2       # n-hop 聚合
+#   dropout: 0.2
+model:
+  name: "gcn_only_flatten_appnp"
+  hidden: 256
+  layers: 1
+  out_array_dim: 15
+  dropout: 0.2
+  K: 2
+  alpha: 0.5
+  use_ln: false
+  num_nodes: 1888
+
+# ==================
+# 损失（按需切换）
+# ==================
+loss:
+  name: "arr_mse"
+
+# ==================
+# 任务 / 日志 / 模型保存
+# ==================
+task:
+  name: "opf_basicA_task"
+
+
+
+# ==================
+# 测试评估（evaluate.py）
+# ==================
+evaluator:
+  name: "arr_rsm_reg"
+  output_dir: "/home/goatoine/Documents/Lanyue/models/GNN/result/May6_chordal_4_reg_1"
+
+logger:
+  log_dir: "/home/goatoine/Documents/Lanyue/models/GNN/result/May6_chordal_4_reg_1/log"
+
+
+checkpoint:
+  dir: "/home/goatoine/Documents/Lanyue/models/GNN/checkpoints/0502_gcn_only_May6_chordal_4_reg_1.pth"

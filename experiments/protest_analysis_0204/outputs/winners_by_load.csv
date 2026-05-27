@@ -1,0 +1,11 @@
+Case,Perturbation,strategy,wins
+case2746wop,"(0.02, 20)",Chordal_MD; Merge=True; A=3.0,11
+case2746wop,"(0.02, 20)",Chordal_AMD; Merge=True; A=3.0,8
+case2746wop,"(0.02, 20)",Chordal_MFI; Merge=True; A=3.0,1
+case2746wop,"(0.04, 869)",Chordal_AMD; Merge=True; A=5.0,12
+case2746wop,"(0.04, 869)",Chordal_AMD; Merge=True; A=4.0,6
+case2746wop,"(0.04, 869)",Chordal_MD; Merge=True; A=5.0,1
+case2746wop,"(0.04, 869)",Chordal_MFI; Merge=True; A=4.0,1
+case2746wop,"(0.06, 1045)",Chordal_AMD; Merge=True; A=5.0,13
+case2746wop,"(0.06, 1045)",Chordal_AMD; Merge=True; A=3.0,6
+case2746wop,"(0.06, 1045)",Chordal_MFI; Merge=True; A=3.0,1

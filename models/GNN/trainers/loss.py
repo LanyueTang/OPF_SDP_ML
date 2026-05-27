@@ -1,12 +1,84 @@
 import torch, torch.nn.functional as F
 from registries import register
+import numpy as np
+from typing import Optional
+
+
+def _get_y_arr(batch, *, like: Optional[torch.Tensor] = None):
+    """Fetch array regression target from batch.
+
+    Accepts either `y_arr_reg` or `y_arr_time`.
+    If `like` is provided, moves/casts the target to like.device and like.dtype.
+    """
+    if "y_arr_reg" in batch:
+        y = batch["y_arr_reg"]
+    elif "y_arr_time" in batch:
+        y = batch["y_arr_time"]
+    else:
+        raise KeyError('batch must contain key "y_arr_reg" or "y_arr_time"')
+
+    if like is not None:
+        y = y.to(device=like.device, dtype=like.dtype)
+    return y
 
 @register("loss", "scalar_mse")
 class ScalarMSE:
     def __init__(self):
         pass
     def __call__(self, out, batch):
-        return F.mse_loss(out["pred_y_reg"], batch["y_reg"], reduction="mean")
+        return F.mse_loss(out["pred_reg"], batch["y_reg"], reduction="mean")
+    
+@register("loss", "arr_mse")
+class ArrMSE:
+    def __init__(self):
+        pass
+    def __call__(self, out, batch):
+        pred = out["pred_arr_reg"]
+        y = _get_y_arr(batch, like=pred)
+        return F.mse_loss(pred, y, reduction="mean")
+
+
+@register("loss", "arr_min_vs_cls_mse")
+class ArrMinVsClsTargetMSE:
+    def __init__(self):
+        pass
+
+    def __call__(self, out, batch):
+        pred = out["pred_arr_reg"]
+        y_arr = _get_y_arr(batch, like=pred)
+        y_cls = batch["y_cls"].to(device=pred.device, dtype=torch.long)
+        batch_idx = torch.arange(pred.shape[0], device=pred.device)
+        y_at_cls = y_arr[batch_idx, y_cls]            
+        pred_min = pred.min(dim=1).values             
+
+        return F.mse_loss(pred_min, y_at_cls, reduction="mean")
+
+
+@register("loss", "arr_weighted_mse")
+class ArrWeightedMSE:
+    """
+    Array-Weighted MSE Loss
+    """
+    def __init__(self, alpha: float = 4.0, gamma: float = 1.0,
+                 eps: float = 1e-8, normalize_weight: bool = True):
+        self.alpha = float(alpha)
+        self.gamma = float(gamma)
+        self.eps = float(eps)
+        self.normalize_weight = bool(normalize_weight)
+
+    def __call__(self, out, batch):
+        pred = out["pred_arr_reg"]
+        y = _get_y_arr(batch, like=pred)
+        y_abs = y.detach().abs()
+        y_max = y_abs.amax(dim=1, keepdim=True).clamp_min(self.eps)
+        y_norm = (y_abs / y_max).clamp_min(0.0)
+        w = 1.0 + self.alpha * torch.pow(y_norm, self.gamma)
+
+        if self.normalize_weight:
+            w = w / w.mean(dim=1, keepdim=True).clamp_min(self.eps)
+
+        loss = w * (pred - y).pow(2)
+        return loss.mean()
 
 @register("loss", "multihead_basic")
 class MultiheadBasic:
@@ -17,8 +89,10 @@ class MultiheadBasic:
     
     def __call__(self, out, batch):
         loss = 0.0
-        if "pred_arr_reg" in out and "y_arr_reg" in batch:
-            loss += self.w_arr * F.l1_loss(out["pred_arr_reg"], batch["y_arr_reg"])
+        if "pred_arr_reg" in out and ("y_arr_reg" in batch or "y_arr_time" in batch):
+            pred = out["pred_arr_reg"]
+            y = _get_y_arr(batch, like=pred)
+            loss += self.w_arr * F.l1_loss(pred, y)
         if "pred_y_reg" in out and "y_reg" in batch:
             loss += self.w_sca * F.mse_loss(out["pred_y_reg"], batch["y_reg"])
         if "logits" in out and "y_cls" in batch:
@@ -36,9 +110,10 @@ class ArrCls:
     def __call__(self, out, batch):
         loss = 0.0
 
-        # --- 数组回归部分 ---
-        if "pred_arr_reg" in out and "y_arr_reg" in batch:
-            loss_arr = F.l1_loss(out["pred_arr_reg"], batch["y_arr_reg"])
+        if "pred_arr_reg" in out and ("y_arr_reg" in batch or "y_arr_time" in batch):
+            pred_arr = out["pred_arr_reg"]
+            y_arr = _get_y_arr(batch, like=pred_arr)
+            loss_arr = F.l1_loss(pred_arr, y_arr)
             loss += self.w_arr * loss_arr
         else:
             loss_arr = 0.0
@@ -132,9 +207,9 @@ def _manual_ce_with_class_weights(logits: torch.Tensor, target: torch.Tensor, cl
     
     return loss
 
-@register("loss", "arr_cls_cbce")
+@register("loss", "arr_cls_cbce_2output")
 class ArrClsCBCEManual:
-    def __init__(self, w_arr: float = 1.0, w_cls: float = 1.0,
+    def __init__(self, w_arr: float = 0.5, w_cls: float = 1.0,
                  tau: float = 1.0,
                  center: bool = True,  
                  beta: float = 0.999,
@@ -162,15 +237,16 @@ class ArrClsCBCEManual:
         loss = 0.0
 
         # --- 数组回归（可选） ---
-        if "pred_arr_reg" in out and "y_arr_reg" in batch and self.w_arr != 0.0:
-            loss_arr = F.l1_loss(out["pred_arr_reg"], batch["y_arr_reg"])
+        if "pred_arr_reg" in out and ("y_arr_reg" in batch or "y_arr_time" in batch) and self.w_arr != 0.0:
+            pred_arr = out["pred_arr_reg"]
+            y_arr = _get_y_arr(batch, like=pred_arr)
+            loss_arr = F.l1_loss(pred_arr, y_arr)
             loss = loss + self.w_arr * loss_arr
 
         # --- 分类（手写 CE + 类权重） ---
         if "y_cls" in batch and self.w_cls != 0.0:
-            pred = out["pred_arr_reg"]
+            pred = out["logits"]
             
-            # ✅ 添加 center 逻辑
             if self.center:
                 pred_center = pred - pred.mean(dim=1, keepdim=True)
                 logits = -pred_center / self.tau
@@ -183,10 +259,9 @@ class ArrClsCBCEManual:
             loss = loss + self.w_cls * loss_cls
 
         return loss
-
-@register("loss", "arr_cls_cbce_1")
+@register("loss", "arr_cls_cbce")
 class ArrClsCBCEManual:
-    def __init__(self, w_arr: float = 1.0, w_cls: float = 1.0,
+    def __init__(self, w_arr: float = 0.5, w_cls: float = 1.0,
                  tau: float = 1.0,
                  center: bool = True,  
                  beta: float = 0.999,
@@ -213,16 +288,15 @@ class ArrClsCBCEManual:
     def __call__(self, out, batch):
         loss = 0.0
 
-        # --- 数组回归（可选） ---
-        if "pred_arr_reg" in out and "y_arr_reg" in batch and self.w_arr != 0.0:
-            loss_arr = F.l1_loss(out["pred_arr_reg"], batch["y_arr_reg"])
+       
+        if "pred_arr_reg" in out and ("y_arr_reg" in batch or "y_arr_time" in batch) and self.w_arr != 0.0:
+            pred_arr = out["pred_arr_reg"]
+            y_arr = _get_y_arr(batch, like=pred_arr)
+            loss_arr = F.l1_loss(pred_arr, y_arr)
             loss = loss + self.w_arr * loss_arr
-
-        # --- 分类（手写 CE + 类权重） ---
         if "y_cls" in batch and self.w_cls != 0.0:
-            pred = out["logits"]
+            pred = out["pred_arr_reg"]
             
-            # ✅ 添加 center 逻辑
             if self.center:
                 pred_center = pred - pred.mean(dim=1, keepdim=True)
                 logits = -pred_center / self.tau
@@ -233,5 +307,79 @@ class ArrClsCBCEManual:
             cw = self.class_weights.to(logits.device) if self.class_weights is not None else None
             loss_cls = _manual_ce_with_class_weights(logits, y, cw)
             loss = loss + self.w_cls * loss_cls
+
+        return loss
+    
+@register("loss", "arr_dec_softmin")
+class ArrDecSoftmin:
+    """
+    Decision-oriented loss for configuration selection:
+      L = L_dec + lam_reg * L_reg
+      out["pred_arr_reg"]: (B, m) predicted y-hat 
+      batch["y_arr_reg"]:  (B, m) true y    
+    """
+
+    def __init__(self,
+                 tau: float = 0.2,
+                 center: bool = False,
+                 lam_soft: float = 1,
+                 lam_reg: float =  1,       
+                 lam_hard: float = 1,       
+                 reduction: str = "mean"):     # "mean" or "sum"
+        self.tau = float(tau)
+        self.center = bool(center)
+        self.lam_soft = float(lam_soft)
+        self.lam_reg = float(lam_reg)
+        self.lam_hard = float(lam_hard)
+        self.reduction = reduction
+
+        if self.tau <= 0:
+            raise ValueError("tau must be > 0")
+        if self.reduction not in ("mean", "sum"):
+            raise ValueError('reduction must be "mean" or "sum"')
+    def __call__(self, out, batch):
+        if "pred_arr_reg" not in out:
+            raise KeyError('out must contain key "pred_arr_reg"')
+        if "y_arr_reg" not in batch and "y_arr_time" not in batch:
+            raise KeyError('batch must contain key "y_arr_reg" or "y_arr_time"')
+
+        pred = out["pred_arr_reg"]  # (B, m)
+        y = _get_y_arr(batch, like=pred)  # (B, m)
+
+        # 0) init total loss (your preferred style)
+        loss = torch.zeros((), device=pred.device, dtype=pred.dtype)
+
+        # 1) soft-argmin distribution p over configurations
+        if self.center:
+            pred_eff = pred - pred.mean(dim=1, keepdim=True)   # (B, m)
+        else:
+            pred_eff = pred
+
+        logits = -pred_eff / self.tau                          # (B, m)
+        p = torch.softmax(logits, dim=1)                       # (B, m)
+
+        # 2) decision-oriented loss: E_{i~p}[ y_true_i ]
+        # per-sample: (p*y).sum(dim=1) -> (B,)
+        y_min = y.min(dim=1, keepdim=True).values
+        y_rel = y - y_min.detach()   # detach recommended: baseline is constant wrt training
+        l_dec = (p * y_rel).sum(dim=1)
+
+        # 3) regression regularization (optional)
+        pred_diff = pred.unsqueeze(2) - pred.unsqueeze(1)   # (B, m, m)
+        y_diff    = y.unsqueeze(2)    - y.unsqueeze(1)      # (B, m, m)
+        l_pair = ((pred_diff - y_diff) ** 2).mean(dim=(1, 2))
+        
+        # instance hardness anchor (forces instance-dependent variation)
+        h_true = y.mean(dim=1)          # (B,)
+        h_pred = pred.mean(dim=1)       # (B,)
+        l_hard = (h_pred - h_true).pow(2)  # (B,)
+
+        # 4) combine
+        l_total = self.lam_soft * l_dec + self.lam_reg * l_pair+ self.lam_hard * l_hard             # (B,)
+
+        if self.reduction == "mean":
+            loss = loss + l_total.mean()
+        else:  # "sum"
+            loss = loss + l_total.sum()
 
         return loss

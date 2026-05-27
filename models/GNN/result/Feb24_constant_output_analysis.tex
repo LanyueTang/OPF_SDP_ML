@@ -1,0 +1,122 @@
+\documentclass[11pt]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath,amssymb,booktabs,geometry}
+\geometry{margin=1in}
+\title{为什么模型输出塌缩为同一个值：基于损失函数与当前实验数值的分析}
+\author{Lanyue 实验诊断}
+\date{2026-02-24}
+
+\begin{document}
+\maketitle
+
+\section{问题定义}
+当前 pointwise 训练把每个 instance 的 6 个策略 regret 都当作监督信号：
+\[
+\mathcal D=\{(x_i, y_{i,k})\mid i=1,\dots,N,\;k=1,\dots,K\},\quad K=6.
+\]
+在本轮实验中，测试集张量形状为 $N\times K=29\times 6$。
+
+用户观察到：模型对不同 instance 的预测几乎相同（接近常数），即
+\[
+\hat y_{i,k}\approx c,\ \forall i,k.
+\]
+
+\section{从损失函数看为什么常数是强吸引解}
+训练损失是标量 MSE：
+\[
+\mathcal L(f)=\frac{1}{NK}\sum_{i=1}^{N}\sum_{k=1}^{K}(f(x_i)-y_{i,k})^2,
+\]
+这里省略策略输入（no-strategy / pointwise 同一输入对应多个标签时）。
+
+\subsection{全局常数解}
+如果限制 $f(x)\equiv c$，最优常数是
+\[
+ c^*=\arg\min_c \frac{1}{NK}\sum_{i,k}(c-y_{i,k})^2
+   =\frac{1}{NK}\sum_{i,k}y_{i,k}=\bar y.
+\]
+所以当模型“提不出稳定可泛化的实例差异”时，优化会自然滑向均值预测。
+
+\subsection{为什么理论上可以学到 instance 均值但实际上没学到}
+对固定 instance $i$，若输入不含策略信息，经验风险对该 instance 的最优预测是
+\[
+ f^*(x_i)=\mu_i:=\frac{1}{K}\sum_{k=1}^{K}y_{i,k}.
+\]
+也就是说，\textbf{理论最优应是“每个 instance 一个均值”}，不是全局一个常数。
+
+但是否能达到该解，取决于：
+\begin{itemize}
+  \item 模型容量与优化是否能拟合 $x_i\mapsto \mu_i$；
+  \item 小样本与隐式正则（dropout、权重衰减、归一化等）是否把解推向低方差函数；
+  \item 训练动力学是否先快速收敛到“近常数盆地”，随后梯度信号不足以逃离。
+\end{itemize}
+
+\section{方差分解：你这组数据里到底有多少“可学的 instance 信息”}
+把总体方差做分解（ANOVA 形式）：
+\[
+\mathrm{Var}(Y)=\underbrace{\mathrm{Var}(\mu_i)}_{\text{instance 间均值差异}}
++\underbrace{\mathbb E_i\big[\mathrm{Var}(Y\mid i)\big]}_{\text{instance 内 6 策略差异}}.
+\]
+
+对当前测试集（$29\times 6$）实测：
+\[
+\mathrm{Var}(Y)=0.052226,
+\quad \mathrm{Var}(\mu_i)=0.024582,
+\quad \mathbb E[\mathrm{Var}(Y\mid i)]=0.027644.
+\]
+因此
+\[
+\frac{\mathrm{Var}(\mu_i)}{\mathrm{Var}(Y)}=0.4707\approx 47.1\%.
+\]
+这说明：\textbf{instance 均值差异并不小（占总方差约 47\%）}，理论上是有可学习空间的。
+
+\section{数值证据：模型确实塌缩到了近常数}
+从结果目录提取（
+\texttt{Feb24\_pointwise\_mlp\_flat\_highvar\_test} 与
+\texttt{Feb24\_pointwise\_mlp\_flat\_highvar\_exaggerated\_test}
+）得到：
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+指标 & baseline & exaggerated node\_load \\
+\midrule
+样本数 ($NK$) & 174 & 174 \\
+$\mathrm{std}(\hat y)$（全体预测标准差） & $4.46\times 10^{-5}$ & $2.82\times 10^{-5}$ \\
+$\mathrm{std}(y)$（全体目标标准差） & 0.22853 & 0.22853 \\
+$\mathrm{std}(\hat\mu_i)$（预测的 instance 均值标准差） & $4.46\times 10^{-5}$ & $2.82\times 10^{-5}$ \\
+$\mathrm{std}(\mu_i)$（真实 instance 均值标准差） & 0.15679 & 0.15679 \\
+$\mathrm{corr}(\hat\mu_i,\mu_i)$ & -0.0299 & -0.1250 \\
+MSE(model) & 0.054687 & 0.053649 \\
+MSE(global mean) & 0.052226 & 0.052226 \\
+MSE(instance-mean oracle) & 0.027644 & 0.027644 \\
+\bottomrule
+\end{tabular}
+\caption{模型输出塌缩诊断：预测方差远小于目标方差，且未超过全局均值基线}
+\end{table}
+
+关键结论：
+\begin{itemize}
+  \item 预测标准差是 $10^{-5}$ 量级，而真实 instance 均值标准差是 $10^{-1}$ 量级，相差约 4 个数量级；
+  \item MSE(model) 甚至略差于全局均值基线（$\text{MSE ratio}>1$）；
+  \item 与 instance-mean oracle 相比仍有巨大差距（0.0536 vs 0.0276）。
+\end{itemize}
+
+这表明当前模型并不是“成功学到了每个 instance 均值”，而是停在了“近常数解”。
+
+\section{为什么放大 node\_load 后仍然接近常数}
+设放大变换为
+\[
+z=\frac{x-\mu_x}{\sigma_x},\qquad z' = s\,\mathrm{sign}(z)|z|^{\gamma},\qquad x'=\mu_x+z'\sigma_x,
+\]
+然后数据管线又做全局 z-score 归一化。该组合会导致：
+\begin{itemize}
+  \item 幅值差异被后续标准化部分抵消；
+  \item 若模型已处于低方差解盆地，放大输入不一定改变输出多样性；
+  \item 在小样本/高维输入下，优化仍可能优先保持低复杂度（近常数）函数。
+\end{itemize}
+
+\section{一句话总结}
+从公式上，MSE 的确允许并偏好常数基线；从你这组实数上，模型输出方差几乎为零且不优于全局均值基线，说明当前训练动力学与有效信号利用失败，导致塌缩到近常数，而不是学到每个 instance 的均值。
+
+\end{document}

@@ -40,11 +40,9 @@ def build(kind: str, name: str, **cfg) -> Any:
         raise RegistryError(
             f"未找到 {kind}:{name}. 可用项：{available}"
         ) from e
-    # 既支持类（需要实例化），也支持无参/有参工厂函数
     try:
         return cls_or_fn(**cfg)
     except TypeError:
-        # 可能是无参数的可调用
         return cls_or_fn()
 
 def available(kind: str):
