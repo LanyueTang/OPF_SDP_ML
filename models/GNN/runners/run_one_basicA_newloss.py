@@ -6,7 +6,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import random
 CONFIG_PATH = Path(os.environ.get(
     "GNN_CONFIG_PATH",
-    str(PROJECT_ROOT / "configs" / "0522_debug.yaml")
+    str(PROJECT_ROOT / "configs" / "0529_array_4_gcn_only.yaml")
 ))
 
 try:

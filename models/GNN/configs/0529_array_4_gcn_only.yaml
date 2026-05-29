@@ -1,0 +1,50 @@
+seed: 42
+
+experiment:
+  run_name: "0529_array_4_gcn_only"
+  root_dir: "/home/goatoine/Documents/Lanyue/models/GNN"
+
+data:
+  npz_path: "/home/goatoine/Documents/Lanyue/data/data_for_GCN/data_basic_GCN/case1888rte_0525_samples.npz"
+  reader: "opf_reg_array"
+  adj_mode: "real"
+  num_workers: 4
+  norm: zscore
+
+train:
+  batch_size: 64
+  epochs: 200
+  lr: 4.0e-3
+
+checkpoint:
+  save_every: 50
+  training_ckpt_path: "/home/goatoine/Documents/Lanyue/models/GNN/checkpoints"
+  resume: false
+  resume_training_path: null
+  eval: false
+  eval_model_path: null
+
+model:
+  name: "gcn_only_flatten_appnp"
+  hidden: 256
+  layers: 1
+  num_nodes: 1888
+  out_array_dim: 15
+  dropout: 0.2
+  K: 2
+  alpha: 0.5
+  use_ln: false
+
+logger: {}
+
+task:
+  name: "opf_basicA_task"
+
+
+loss:
+  name: "arr_mse"
+
+
+evaluator:
+  name: "rsm_reg"
+

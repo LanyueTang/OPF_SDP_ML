@@ -1,0 +1,27 @@
+{
+  "rmse_all_pairs_reg": 1.676620364189148,
+  "mean_selected_true_reg": 0.842627227306366,
+  "median_selected_true_reg": 0.5277670621871948,
+  "max_selected_true_reg": 6.444394588470459,
+  "N": 163,
+  "K": 15,
+  "regret_compare": {
+    "global_best_mean_strategy": 12,
+    "model_selected_regret": {
+      "mean": 0.842627227306366,
+      "median": 0.5277670621871948,
+      "p90": 1.892817807197571
+    },
+    "global_fixed_strategy_regret": {
+      "mean": 0.9333593249320984,
+      "median": 0.389812707901001,
+      "p90": 2.74928207397461
+    }
+  },
+  "virtual_strategy": {
+    "name": "Virtual_BestByPred",
+    "mean_selected_true_reg": 0.842627227306366,
+    "median_selected_true_reg": 0.5277670621871948,
+    "max_selected_true_reg": 6.444394588470459
+  }
+}
